@@ -53,7 +53,10 @@ In RAG il collo di bottiglia è il **prompt processing** (contesti 4–8k token)
 - [x] Progetto uv `haiku-local-rag` (layout `src/haiku_local_rag`), dipendenze installate: **haiku.rag 0.92.0**, fastapi, uvicorn, jinja2, python-multipart, ocrmac, pyyaml; `git init` fatto, primo commit con setup + container.
 - [x] `haiku.rag.yaml` scritto e **validato** con `AppConfig.model_validate` (reranker `cross-encoder` verificato nel sorgente; prompt VLM custom in `prompts.picture_description`).
 - [x] `uv run haiku-rag doctor` gira: segnala solo "Database path does not exist" (normale prima del primo ingest).
-- [ ] Colima: primo avvio in corso → poi `docker compose up -d --build` e `curl 127.0.0.1:8000/health`.
+- [x] Colima attivo (Docker 29.5, VM vz 4 CPU / 8 GB). Contesto docker `colima`. Dopo un riavvio del Mac: `colima start` (riusa la config in `~/.colima/default/colima.yaml`).
+- [x] **Portainer CE** (`infra/portainer.compose.yaml`) su https://127.0.0.1:9443, dati nel volume `portainer_data`. Al primo avvio l'admin va creato entro 5 min (altrimenti `docker restart portainer`).
+- [x] Verificato: un container raggiunge Ollama su `host.docker.internal:11434` anche con Ollama in ascolto solo su 127.0.0.1.
+- [ ] Build immagine RAG in corso → poi `docker compose up -d` e `curl 127.0.0.1:8000/health`.
 - [ ] Ingest di prova end-to-end (nel container).
 
 > ⚠️ **Lezione di rete:** connessione lenta/instabile. Pull Ollama + `uv add` in parallelo → `uv` fallisce per timeout (`transformers` wheel). Usare `UV_HTTP_TIMEOUT=600` e non scaricare modelli e pacchetti contemporaneamente.
@@ -63,7 +66,7 @@ File: `Dockerfile`, `compose.yaml`, `docker/entrypoint.sh`, `docker/default.haik
 - Immagine `python:3.12-slim-bookworm` + uv; **torch solo CPU** su Linux (indice `pytorch-cpu` in `pyproject.toml`, torch/torchvision dipendenze dirette altrimenti le `sources` uv non si applicano → senza, l'immagine tirerebbe giù GB di pacchetti `nvidia-*`).
 - OCR nel container: **Tesseract `ita`+`eng`** (ocrmac è solo macOS; resta per l'esecuzione nativa, dipendenza con marker `sys_platform == 'darwin'`).
 - `/data/config/haiku.rag.yaml` creato dall'entrypoint al primo avvio copiando `docker/default.haiku.rag.yaml`; poi è la pagina Admin a modificarlo. Modelli Docling/HF scaricati una volta in `/data/cache/huggingface`.
-- Ollama raggiunto a `http://host.docker.internal:11434` (`extra_hosts: host-gateway`). Con Colima l'host è raggiungibile anche con Ollama in ascolto su 127.0.0.1 — **da verificare**.
+- Ollama raggiunto a `http://host.docker.internal:11434` (`extra_hosts: host-gateway`). Con Colima funziona anche con Ollama in ascolto su 127.0.0.1 (**verificato**).
 - Limiti risorse da `.env`: `RAG_CPUS=4`, `RAG_MEMORY=6g`, `RAG_THREADS=2`; porta solo su `127.0.0.1:8000`.
 - Colima avviato con: `colima start --vm-type vz --vz-rosetta --mount-type virtiofs --cpu 4 --memory 8 --disk 60 --mount ~/haiku-rag-data:w --mount <progetto>`.
 - Spostare su un'altra macchina: repo (o immagine `docker save`) + cartella dati + Ollama installato sull'host. Immagine buildata per arm64: su server x86 rifare `docker compose build` (o `buildx --platform linux/amd64`).

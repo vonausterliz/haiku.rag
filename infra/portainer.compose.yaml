@@ -1,0 +1,15 @@
+# Portainer CE: UI di gestione dei container. Separato dal RAG (non serve per spostarlo).
+# Avvio: docker compose -f infra/portainer.compose.yaml up -d   →   https://127.0.0.1:9443
+services:
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9443:9443"   # solo locale
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+volumes:
+  portainer_data:
