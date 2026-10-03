@@ -1,0 +1,14 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Dati locali (in produzione vivono in ~/haiku-rag-data, montata nel container)
+data/
+.env

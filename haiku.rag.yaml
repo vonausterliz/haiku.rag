@@ -1,0 +1,70 @@
+# haiku.rag.yaml — configurazione iniziale (verrà gestita dalla pagina Admin)
+# Chiavi verificate sulla documentazione ufficiale: https://ggozad.github.io/haiku.rag/configuration/
+environment: production
+
+providers:
+  ollama:
+    base_url: http://localhost:11434
+
+embeddings:
+  model:
+    provider: ollama
+    name: qwen3-embedding:4b
+    vector_dim: 2560
+  batch_size: 32          # basso di proposito: ingestion "gentile" (default upstream 512)
+
+qa:
+  model:
+    provider: ollama
+    name: qwen3.6:35b-a3b
+    temperature: 0.3
+    max_tokens: 1500
+    thinking: false
+
+reranking:
+  model:
+    provider: cross-encoder            # locale, multilingue, ~600 MB
+    name: BAAI/bge-reranker-v2-m3      # provider verificato in haiku/rag/reranking
+
+processing:
+  chunk_size: 384
+  chunker: docling-local
+  chunker_type: hybrid
+  chunking_tokenizer: "Qwen/Qwen3-Embedding-0.6B"   # stesso tokenizer della famiglia embedder
+  chunking_merge_peers: true
+  chunking_use_markdown_tables: true
+  converter: docling-local
+  split_pages: 10
+  conversion_timeout: 900
+  extract_pdf_attachments: true
+  pictures: description
+  min_picture_size: 64
+  conversion_options:
+    pdf_backend: docling_parse
+    do_ocr: true
+    force_ocr: false
+    ocr_engine: ocrmac                 # OCR nativo Apple Vision: leggero, buon italiano
+    ocr_lang: ["it-IT", "en-US"]
+    do_table_structure: true
+    table_mode: accurate
+    images_scale: 2.0
+    generate_page_images: false        # risparmio RAM/disco
+    picture_description:
+      model:
+        provider: ollama
+        name: qwen3-vl:8b
+        thinking: false
+      timeout: 180
+      max_tokens: 700                  # descrizioni precise (default upstream 200)
+
+lancedb:
+  databases:
+    default: ./data/corpora/default.lancedb
+
+prompts:
+  picture_description: >-
+    Describe this image precisely and exhaustively, in the same language as any text it contains
+    (Italian or English). State the image type (photo, chart, diagram, table, screenshot, scan, logo).
+    Transcribe ALL visible text verbatim. For charts and tables report axes, labels, units and every
+    readable value. For diagrams describe components and their relationships/flows. Mention notable
+    visual details relevant to understanding the document. Do not invent information that is not visible.

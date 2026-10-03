@@ -1,0 +1,34 @@
+[project]
+name = "haiku-local-rag"
+version = "0.1.0"
+description = "RAG locale basato su haiku.rag + Ollama, con UI di amministrazione"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.2",
+    "haiku-rag>=0.92.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "ocrmac>=1.0.1; sys_platform == 'darwin'",
+    "python-multipart>=0.0.32",
+    "pyyaml>=6.0.3",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+haiku-local-rag = "haiku_local_rag:main"
+
+# Nel container (Linux) torch solo CPU: niente wheel CUDA da GB inutili
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
