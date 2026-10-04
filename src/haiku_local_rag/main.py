@@ -32,6 +32,7 @@ EDITABLE_KEYS: dict[str, type] = {
     "embeddings.batch_size": int,
     "reranking.model": dict,
     "processing.chunk_size": int,
+    "processing.conversion_timeout": int,
     "processing.chunker_type": str,
     "processing.chunking_use_markdown_tables": bool,
     "processing.pictures": str,

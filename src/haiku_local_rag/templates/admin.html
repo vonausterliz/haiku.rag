@@ -93,6 +93,9 @@
     <label class="field">Timeout descrizione (s)
       <input type="number" min="10" step="10" data-key="processing.conversion_options.picture_description.timeout" data-type="int" value="{{ pic.timeout }}">
     </label>
+    <label class="field">Timeout conversione per documento (s)
+      <input type="number" min="60" step="60" data-key="processing.conversion_timeout" data-type="int" value="{{ proc.conversion_timeout }}">
+    </label>
     <label class="field">Tabelle
       <select data-key="processing.conversion_options.table_mode">
         {% for v, label in [('accurate', 'Accurato'), ('fast', 'Veloce')] %}
