@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Amministrazione · Haiku RAG{% endblock %}
+{% block meta %}Config: <code>{{ config_path }}</code>{% endblock %}
+
+{% set qa = config.qa.model %}
+{% set emb = config.embeddings %}
+{% set proc = config.processing %}
+{% set conv = proc.conversion_options %}
+{% set pic = conv.picture_description %}
+
+{% block content %}
+<section class="card">
+  <h2>Stato</h2>
+  <p class="hint">Ollama gira sull'host; il RAG lo raggiunge all'indirizzo configurato qui sotto.</p>
+  <dl class="kv" id="status"><dt>Ollama</dt><dd>verifica in corso…</dd></dl>
+</section>
+
+<section class="card">
+  <h2>Modelli</h2>
+  <p class="hint">Gli elenchi mostrano i modelli installati in Ollama, filtrati per capacità.</p>
+  <div class="grid">
+    <label class="field">LLM per le risposte
+      <select data-key="qa.model.name" data-current="{{ qa.name }}" data-role="llm"></select>
+    </label>
+    <label class="field">Embeddings
+      <select data-key="embeddings.model.name" data-current="{{ emb.model.name }}" data-role="embedding" id="embedder"></select>
+    </label>
+    <label class="field">Visione (descrizione immagini)
+      <select data-key="processing.conversion_options.picture_description.model.name" data-current="{{ pic.model.name }}" data-role="vision"></select>
+    </label>
+    <label class="field">Dimensione vettore embeddings
+      <input type="number" data-key="embeddings.model.vector_dim" data-type="int" value="{{ emb.model.vector_dim }}" id="vector-dim" readonly>
+    </label>
+    <label class="field wide">URL di Ollama
+      <input type="text" data-key="providers.ollama.base_url" value="{{ config.providers.ollama.base_url }}">
+    </label>
+  </div>
+  <div class="notice" id="reindex-warning" hidden>
+    Cambiare il modello di embeddings rende incompatibili i corpus esistenti: andranno <strong>reindicizzati</strong>
+    (dal Markdown già convertito, senza rifare OCR e descrizioni).
+  </div>
+  <div id="model-info" class="hint" style="margin-top:12px"></div>
+</section>
+
+<section class="card">
+  <h2>Risposte</h2>
+  <div class="grid">
+    <label class="field">Temperatura
+      <input type="number" step="0.05" min="0" max="2" data-key="qa.model.temperature" data-type="float" value="{{ qa.temperature if qa.temperature is not none else '' }}">
+    </label>
+    <label class="field">Token massimi della risposta
+      <input type="number" min="64" step="64" data-key="qa.model.max_tokens" data-type="int" value="{{ qa.max_tokens if qa.max_tokens is not none else '' }}">
+    </label>
+    <label class="check"><input type="checkbox" data-key="qa.model.thinking" data-type="bool" {{ 'checked' if qa.thinking }}>
+      Ragionamento (thinking): risposte più accurate ma più lente</label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Ricerca</h2>
+  <div class="grid">
+    <label class="check"><input type="checkbox" id="rerank-on" {{ 'checked' if config.reranking.model }}> Reranking dei risultati</label>
+    <label class="field">Modello di reranking (cross-encoder)
+      <input type="text" id="rerank-model" value="{{ config.reranking.model.name if config.reranking.model else 'BAAI/bge-reranker-v2-m3' }}">
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Elaborazione documenti</h2>
+  <p class="hint">Valgono per i documenti indicizzati da ora in poi.</p>
+  <div class="grid">
+    <label class="field">Dimensione chunk (token)
+      <input type="number" min="64" step="32" data-key="processing.chunk_size" data-type="int" value="{{ proc.chunk_size }}">
+    </label>
+    <label class="field">Tipo di chunker
+      <select data-key="processing.chunker_type">
+        {% for v, label in [('hybrid', 'Ibrido (rispetta la dimensione)'), ('hierarchical', 'Gerarchico (un chunk per elemento)')] %}
+        <option value="{{ v }}" {{ 'selected' if proc.chunker_type == v }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Immagini
+      <select data-key="processing.pictures">
+        {% for v, label in [('description', 'Descrivi con il modello di visione'), ('image', 'Conserva senza descrivere'), ('none', 'Ignora')] %}
+        <option value="{{ v }}" {{ 'selected' if proc.pictures == v }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Token massimi per descrizione immagine
+      <input type="number" min="50" step="50" data-key="processing.conversion_options.picture_description.max_tokens" data-type="int" value="{{ pic.max_tokens }}">
+    </label>
+    <label class="field">Timeout descrizione (s)
+      <input type="number" min="10" step="10" data-key="processing.conversion_options.picture_description.timeout" data-type="int" value="{{ pic.timeout }}">
+    </label>
+    <label class="field">Tabelle
+      <select data-key="processing.conversion_options.table_mode">
+        {% for v, label in [('accurate', 'Accurato'), ('fast', 'Veloce')] %}
+        <option value="{{ v }}" {{ 'selected' if conv.table_mode == v }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" data-key="processing.chunking_use_markdown_tables" data-type="bool" {{ 'checked' if proc.chunking_use_markdown_tables }}> Tabelle in formato Markdown nei chunk</label>
+    <label class="field wide">Prompt per la descrizione delle immagini
+      <textarea rows="4" data-key="prompts.picture_description">{{ config.prompts.picture_description }}</textarea>
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>OCR</h2>
+  <div class="grid">
+    <label class="check"><input type="checkbox" data-key="processing.conversion_options.do_ocr" data-type="bool" {{ 'checked' if conv.do_ocr }}> OCR attivo</label>
+    <label class="check"><input type="checkbox" data-key="processing.conversion_options.force_ocr" data-type="bool" {{ 'checked' if conv.force_ocr }}> Forza OCR su tutta la pagina (scansioni)</label>
+    <label class="field">Motore
+      <select data-key="processing.conversion_options.ocr_engine">
+        {% for v in ['tesseract', 'rapidocr', 'easyocr', 'ocrmac', 'auto'] %}
+        <option value="{{ v }}" {{ 'selected' if conv.ocr_engine == v }}>{{ v }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">Lingue (separate da virgola)
+      <input type="text" data-key="processing.conversion_options.ocr_lang" data-type="list" value="{{ conv.ocr_lang | join(', ') }}">
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Corpus</h2>
+  <p class="hint">La gestione dei corpus (creazione, caricamento documenti, coda di ingestion) arriverà in una pagina dedicata.</p>
+  <dl class="kv">
+    {% for name, location in config.lancedb.databases.items() %}
+    <dt>{{ name }}</dt><dd><code>{{ location }}</code></dd>
+    {% else %}
+    <dt>—</dt><dd>nessun corpus configurato</dd>
+    {% endfor %}
+  </dl>
+</section>
+
+<div class="savebar">
+  <button id="save">Salva configurazione</button>
+  <button class="secondary" onclick="location.reload()">Annulla modifiche</button>
+  <span class="msg" id="save-msg"></span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const roles = { llm: m => m.is_llm, embedding: m => m.is_embedding, vision: m => m.is_vision };
+let models = [];
+const initialEmbedder = document.getElementById("embedder").dataset.current;
+
+function el(tag, text) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; return n; }
+
+function describe(m) {
+  if (!m) return "";
+  const parts = [m.parameters, m.quantization, `${m.size_gib} GB`];
+  if (m.context_length) parts.push(`contesto ${Math.round(m.context_length / 1024)}K`);
+  if (m.experts) parts.push(`MoE ${m.experts} esperti`);
+  return `${m.name}: ${parts.filter(Boolean).join(" · ")} — ${m.capabilities.join(", ")}`;
+}
+
+async function loadModels() {
+  const res = await fetch("/api/models");
+  if (!res.ok) { document.getElementById("model-info").textContent = "Impossibile leggere i modelli da Ollama."; return; }
+  models = await res.json();
+  for (const select of document.querySelectorAll("select[data-role]")) {
+    const current = select.dataset.current;
+    const candidates = models.filter(roles[select.dataset.role]);
+    if (current && !candidates.some(m => m.name === current)) {
+      const missing = el("option", `${current} (non installato)`);
+      missing.value = current;
+      select.appendChild(missing);
+    }
+    for (const m of candidates) {
+      const opt = el("option", `${m.name} — ${m.parameters ?? ""} ${m.size_gib} GB`);
+      opt.value = m.name;
+      select.appendChild(opt);
+    }
+    select.value = current;
+    select.addEventListener("change", showModelInfo);
+  }
+  showModelInfo();
+}
+
+function showModelInfo() {
+  const box = document.getElementById("model-info");
+  box.replaceChildren();
+  for (const select of document.querySelectorAll("select[data-role]")) {
+    const line = el("div", describe(models.find(m => m.name === select.value)));
+    box.appendChild(line);
+  }
+  const embedder = document.getElementById("embedder");
+  const chosen = models.find(m => m.name === embedder.value);
+  if (chosen?.embedding_length) document.getElementById("vector-dim").value = chosen.embedding_length;
+  document.getElementById("reindex-warning").hidden = embedder.value === initialEmbedder;
+}
+
+async function loadStatus() {
+  const res = await fetch("/api/status");
+  const data = await res.json();
+  const dl = document.getElementById("status");
+  dl.replaceChildren();
+  const add = (k, v, cls) => { dl.appendChild(el("dt", k)); const dd = el("dd", v); if (cls) dd.className = cls; dl.appendChild(dd); };
+  const o = data.ollama;
+  if (o.reachable) {
+    add("Ollama", `raggiungibile · versione ${o.version}`, "ok");
+    add("In memoria", o.loaded.length ? o.loaded.map(m => `${m.name} (${m.vram_gib} GB)`).join(", ") : "nessun modello caricato");
+  } else {
+    add("Ollama", `non raggiungibile: ${o.error}`, "err");
+  }
+  const h = data.host;
+  if (h) {
+    add("Host", `${h.chip} · ${h.ram_gib} GB RAM · GPU ${h.gpu_cores ? h.gpu_cores + " core" : h.gpu ?? "—"}`);
+    add("Memoria GPU utile", `${h.gpu_memory_gib} GB (${h.gpu_memory_source})`);
+  } else {
+    add("Host", "sconosciuto: esegui scripts/host-probe.sh sull'host");
+  }
+}
+
+function collect() {
+  const changes = {};
+  for (const input of document.querySelectorAll("[data-key]")) {
+    const type = input.dataset.type;
+    let value = input.value;
+    if (type === "bool") value = input.checked;
+    else if (type === "int") value = value === "" ? null : parseInt(value, 10);
+    else if (type === "float") value = value === "" ? null : parseFloat(value);
+    else if (type === "list") value = value.split(",").map(s => s.trim()).filter(Boolean);
+    changes[input.dataset.key] = value;
+  }
+  const rerankOn = document.getElementById("rerank-on").checked;
+  const rerankModel = document.getElementById("rerank-model").value.trim();
+  changes["reranking.model"] = rerankOn && rerankModel ? { provider: "cross-encoder", name: rerankModel } : null;
+  return changes;
+}
+
+document.getElementById("save").addEventListener("click", async (e) => {
+  const msg = document.getElementById("save-msg");
+  e.target.disabled = true;
+  msg.className = "msg";
+  msg.textContent = "Salvataggio…";
+  try {
+    const res = await fetch("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collect()),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const detail = Array.isArray(data.detail) ? data.detail.map(d => `${d.loc.join(".")}: ${d.msg}`).join("; ") : data.detail;
+      throw new Error(detail);
+    }
+    msg.className = "msg ok";
+    msg.textContent = data.reindex_required
+      ? "Salvato. Attenzione: il modello di embeddings è cambiato, i corpus vanno reindicizzati."
+      : "Salvato. Le modifiche valgono dalla prossima domanda.";
+  } catch (err) {
+    msg.className = "msg err";
+    msg.textContent = `Non salvato: ${err.message}`;
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
+loadStatus();
+loadModels();
+</script>
+{% endblock %}

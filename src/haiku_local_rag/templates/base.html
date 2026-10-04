@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Haiku RAG{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="top">
+    <span class="brand">Haiku RAG</span>
+    <nav>
+      <a href="/" class="{{ 'active' if request.url.path == '/' }}">Chat</a>
+      <a href="/admin" class="{{ 'active' if request.url.path == '/admin' }}">Amministrazione</a>
+    </nav>
+    <span class="meta">{% block meta %}{% endblock %}</span>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

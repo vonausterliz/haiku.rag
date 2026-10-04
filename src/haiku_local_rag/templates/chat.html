@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Chat · Haiku RAG{% endblock %}
+{% block meta %}Modello: {{ llm }} · <a href="/admin">cambia</a>{% endblock %}
+
+{% block content %}
+<div class="chat" id="chat">
+  <div class="msg-bot">
+    <div class="answer">
+      <p>Fai una domanda sui documenti indicizzati. Le risposte citano le fonti con pagine e sezioni.</p>
+      {% if not corpora %}
+      <p class="err">Nessun corpus configurato: aggiungine uno dalla pagina <a href="/admin">Amministrazione</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="composer">
+  {% if corpora|length > 1 %}
+  <div class="corpora">
+    Cerca in:
+    {% for name in corpora %}
+    <label class="check"><input type="checkbox" name="corpus" value="{{ name }}" checked> {{ name }}</label>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <form id="ask-form">
+    <textarea id="question" rows="2" placeholder="Scrivi una domanda… (Invio per inviare, Maiusc+Invio per andare a capo)" required></textarea>
+    <button type="submit" id="send">Invia</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/marked.min.js"></script>
+<script>
+const chat = document.getElementById("chat");
+const form = document.getElementById("ask-form");
+const question = document.getElementById("question");
+const send = document.getElementById("send");
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function renderCitations(citations) {
+  const details = el("details");
+  details.appendChild(el("summary", null, `Fonti (${citations.length})`));
+  for (const c of citations) {
+    const box = el("div", "citation");
+    const where = [
+      c.corpus,
+      c.pages.length ? `p. ${c.pages.join(", ")}` : null,
+      c.headings.length ? c.headings.join(" › ") : null,
+    ].filter(Boolean).join(" · ");
+    box.appendChild(el("div", "src", `[${c.index ?? "?"}] ${c.title}`));
+    box.appendChild(el("div", "pill", where));
+    box.appendChild(el("div", "content", c.content));
+    details.appendChild(box);
+  }
+  return details;
+}
+
+async function ask(text) {
+  chat.appendChild(el("div", "msg-user", text));
+  const bot = el("div", "msg-bot");
+  const waiting = el("div", "thinking", "Cerco nei documenti e preparo la risposta…");
+  bot.appendChild(waiting);
+  chat.appendChild(bot);
+  bot.scrollIntoView({ behavior: "smooth" });
+
+  const corpora = [...document.querySelectorAll("input[name=corpus]:checked")].map(i => i.value);
+  const started = performance.now();
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: text, corpora: corpora.length ? corpora : null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail));
+    waiting.remove();
+    const answer = el("div", "answer");
+    answer.innerHTML = marked.parse(data.answer);
+    bot.appendChild(answer);
+    if (data.citations.length) bot.appendChild(renderCitations(data.citations));
+    bot.appendChild(el("div", "pill", `${((performance.now() - started) / 1000).toFixed(1)} s`));
+  } catch (err) {
+    waiting.className = "err";
+    waiting.textContent = `Errore: ${err.message}`;
+  }
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = question.value.trim();
+  if (!text) return;
+  question.value = "";
+  send.disabled = true;
+  await ask(text);
+  send.disabled = false;
+  question.focus();
+});
+
+question.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+});
+</script>
+{% endblock %}
