@@ -128,6 +128,32 @@ Usare il **.md come sorgente di verità** per indicizzazione e reindex.
 - `embeddings.batch_size` basso (32), pausa configurabile tra documenti, `split_pages: 10`.
 - Pausa/riprendi coda + "pausa automatica se l'utente sta chattando" (lock condiviso).
 
+### Auto-configurazione modelli (richiesta 2026-10-04)
+Eseguibile **al primo avvio** (wizard) e **in qualsiasi momento** da Admin ("Riconfigura automaticamente").
+1. **Profilo hardware dell'host** — il container vede solo la VM Colima (4 CPU/8 GB), quindi:
+   `scripts/host-probe.sh` (gira sull'host, macOS/Linux) → `~/haiku-rag-data/config/host.json`
+   (chip, RAM totale, core GPU, banda memoria stimata, VRAM utile ≈ wired limit GPU, disco libero, OS).
+   Fallback: inserimento manuale in Admin. Budget memoria = VRAM utile − margine OS.
+2. **Inventario Ollama** — `/api/tags` + `/api/show` per modello: dimensione, quantizzazione, `context_length`,
+   architettura (MoE: `expert_count`/`expert_used_count`), `capabilities` (completion/embedding/vision/tools/thinking).
+   Classificazione per ruolo: LLM · embeddings · VLM. Scarto di ciò che non entra nel budget
+   (pesi + KV cache per il contesto RAG target ~8k, + embedder residente in query).
+3. **Modalità di analisi selezionabile dall'utente:**
+   - **Rapida (solo metadati):** velocità stimata da parametri attivi × banda memoria.
+   - **Completa (metadati + benchmark):** per i candidati che passano il filtro, prompt RAG reale ~4k token (IT) →
+     misura `prompt_eval` tok/s, `eval` tok/s, TTFT, RAM effettiva (`/api/ps`); embedder: throughput chunk/s;
+     VLM: tempo per immagine di test. 1–3 min per modello, con progress in UI e possibilità di annullare.
+4. **Punteggio per ruolo (uso RAG):**
+   - LLM: TTFT/prompt-processing (peso alto: contesti lunghi) > generazione tok/s (soglia fruibilità ≥ 15 tok/s) >
+     qualità (famiglia/parametri totali) > tools/thinking > supporto IT > margine RAM.
+   - Embeddings: multilingue, contesto, dimensione vettore, throughput; penalità se diverso dall'attuale (reindex).
+   - VLM: qualità/dimensione, deve convivere con l'embedder durante l'ingestion.
+5. **Esito: proposta, conferma utente.** Classifica per ruolo con motivazioni e metriche; applicazione con un click
+   (scrive `haiku.rag.yaml`); avviso esplicito + job di reindex se cambia l'embedder.
+6. **Modelli mancanti:** catalogo curato (`catalog.yaml` versionato nel repo) di modelli consigliati per fascia di RAM e ruolo;
+   se nessun installato è adeguato → suggerimento con **pull su richiesta** dalla UI (barra di avanzamento, `/api/pull` streaming).
+7. Risultati salvati in `~/haiku-rag-data/config/autoconfig-<timestamp>.json` (storico, confronto tra esecuzioni).
+
 ### Pagina Admin (campi)
 LLM (select da `ollama list` + pull), temperature, max_tokens, thinking · Embedder (select + avviso reindex) · VLM + max_tokens + prompt descrizione (IT, "descrivi in modo preciso: testo visibile, dati di grafici/tabelle, relazioni") · chunk_size, chunker_type, tabelle markdown · OCR on/force, lingue · reranking on/off · profilo ingestion · stato Ollama (`/api/ps`, RAM).
 
@@ -135,7 +161,7 @@ LLM (select da `ollama list` + pull), temperature, max_tokens, thinking · Embed
 1. Verificare pull completati (`~/Applications/Ollama.app/Contents/Resources/ollama list`) e `uv run haiku-rag doctor`.
 2. Test end-to-end da CLI: `uv run haiku-rag add-src <pdf>` + `uv run haiku-rag ask "..."`; misurare RAM (`/api/ps`) e tempi; verificare la qualità delle descrizioni VLM (prompt in `prompts.picture_description`) e la latenza del reranker.
 3. Verificare API Python di haiku.rag (client, multi-db, conversione a Markdown via Docling) — leggere il codice in `.venv/lib/python3.12/site-packages/haiku/rag/`.
-4. Implementare `app/` secondo §7, partendo da coda + pipeline, poi UI.
+4. Implementare `app/` secondo §7, partendo da coda + pipeline, poi UI (Admin per prima, con l'auto-configurazione).
 5. LaunchAgent per Ollama e per l'app.
 6. Benchmark qualità su un set di 10–20 domande reali; eventuale confronto `gemma4:26b`.
 
