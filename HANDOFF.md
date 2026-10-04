@@ -4,8 +4,8 @@ _Ultimo aggiornamento: 2026-10-04 notte · Owner: Luca · Stato: **infrastruttur
 
 ## ▶ Ripresa (leggere per primo)
 Lasciati in esecuzione la notte del 2026-10-04 (verificare l'esito):
-1. **Pull `qwen3.6:35b-a3b`** → `~/Applications/Ollama.app/Contents/Resources/ollama list` deve mostrare 3 modelli. Se manca: `ollama pull qwen3.6:35b-a3b` (riprende dal punto in cui si era fermato).
-2. **Install `docker-buildx`** in `~/.docker/cli-plugins/` → `docker buildx version`. Se il file è assente o corrotto, riscaricarlo da github.com/docker/buildx/releases (`buildx-<ver>.darwin-arm64`).
+1. ✅ **Pull `qwen3.6:35b-a3b` completato** (22 GB; tutti e 3 i modelli presenti). Controllo: `~/Applications/Ollama.app/Contents/Resources/ollama list` deve mostrare 3 modelli. Se manca: `ollama pull qwen3.6:35b-a3b` (riprende dal punto in cui si era fermato).
+2. ✅ **`docker-buildx` v0.37.2 installato** in `~/.docker/cli-plugins/`. Controllo: `docker buildx version`. Se il file è assente o corrotto, riscaricarlo da github.com/docker/buildx/releases (`buildx-<ver>.darwin-arm64`).
 3. **Build + avvio container RAG + /health**, in coda dopo buildx → log in **`.build.log`** (gitignored). Atteso: JSON da `/health` con `ollama.reachable: true`.
 
 Dopo un riavvio del Mac, prima di tutto:
@@ -68,7 +68,7 @@ In RAG il collo di bottiglia è il **prompt processing** (contesti 4–8k token)
   - ⚠️ Non è persistente: al riavvio va rilanciato → TODO: LaunchAgent (`~/Library/LaunchAgents/com.local.ollama.plist`) con queste env, oppure aprire Ollama.app e impostarle con `launchctl setenv`.
 - [x] `qwen3-embedding:4b` scaricato.
 - [x] `qwen3-vl:8b` scaricato.
-- [ ] `qwen3.6:35b-a3b`: **pull in corso** a fine sessione → verificare con `ollama list`, eventualmente rilanciare `ollama pull` (riprende da dove si era fermato).
+- [x] `qwen3.6:35b-a3b` scaricato (22 GB). ~~pull in corso a fine sessione → verificare con `ollama list`, eventualmente rilanciare `ollama pull` (riprende da dove si era fermato).~~
 - [x] Progetto uv `haiku-local-rag` (layout `src/haiku_local_rag`), dipendenze installate: **haiku.rag 0.92.0**, fastapi, uvicorn, jinja2, python-multipart, ocrmac, pyyaml; `git init` fatto, primo commit con setup + container.
 - [x] `haiku.rag.yaml` scritto e **validato** con `AppConfig.model_validate` (reranker `cross-encoder` verificato nel sorgente; prompt VLM custom in `prompts.picture_description`).
 - [x] `uv run haiku-rag doctor` gira: segnala solo "Database path does not exist" (normale prima del primo ingest).
