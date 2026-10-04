@@ -1,12 +1,14 @@
 # HANDOFF — RAG locale basato su haiku.rag + Ollama
 
-_Ultimo aggiornamento: 2026-10-04 notte · Owner: Luca · Stato: **infrastruttura pronta, codice applicativo da scrivere**_
+_Ultimo aggiornamento: 2026-10-04 04:35 · Owner: Luca · Stato: **infrastruttura pronta, codice applicativo da scrivere**_
 
 ## ▶ Ripresa (leggere per primo)
-Lasciati in esecuzione la notte del 2026-10-04 (verificare l'esito):
+Operazioni notturne del 2026-10-04 — **tutte completate**:
 1. ✅ **Pull `qwen3.6:35b-a3b` completato** (22 GB; tutti e 3 i modelli presenti). Controllo: `~/Applications/Ollama.app/Contents/Resources/ollama list` deve mostrare 3 modelli. Se manca: `ollama pull qwen3.6:35b-a3b` (riprende dal punto in cui si era fermato).
 2. ✅ **`docker-buildx` v0.37.2 installato** in `~/.docker/cli-plugins/`. Controllo: `docker buildx version`. Se il file è assente o corrotto, riscaricarlo da github.com/docker/buildx/releases (`buildx-<ver>.darwin-arm64`).
-3. **Build + avvio container RAG + /health**, in coda dopo buildx → log in **`.build.log`** (gitignored). Atteso: JSON da `/health` con `ollama.reachable: true`.
+3. ✅ **Container RAG buildato e avviato**: immagine `haiku-local-rag:latest` 3,96 GB (arm64), container `haiku-rag` **healthy**. `/health` → config `/data/config/haiku.rag.yaml`, Ollama raggiungibile, 3 modelli visti. Primo avvio: config di default copiata e ~2,2 GB di modelli Docling/HF scaricati in `~/haiku-rag-data/cache` (avvisi HF senza token: innocui). Log build in `.build.log` (gitignored).
+
+**Infrastruttura completa.** Prossimo passo: §8 punto 2 (ingest di prova) e poi l'app.
 
 Dopo un riavvio del Mac, prima di tutto:
 ```sh
@@ -75,7 +77,7 @@ In RAG il collo di bottiglia è il **prompt processing** (contesti 4–8k token)
 - [x] Colima attivo (Docker 29.5, VM vz 4 CPU / 8 GB). Contesto docker `colima`. Dopo un riavvio del Mac: `colima start` (riusa la config in `~/.colima/default/colima.yaml`).
 - [x] **Portainer CE** (`infra/portainer.compose.yaml`) su https://127.0.0.1:9443, dati nel volume `portainer_data`. Al primo avvio l'admin va creato entro 5 min (altrimenti `docker restart portainer`).
 - [x] Verificato: un container raggiunge Ollama su `host.docker.internal:11434` anche con Ollama in ascolto solo su 127.0.0.1.
-- [ ] Primo `docker compose build` **fallito**: mancava il plugin buildx e il builder legacy non supporta `RUN --mount`. buildx in download, poi build in coda (vedi "Ripresa").
+- [x] Immagine RAG buildata con buildx (il builder legacy non supporta `RUN --mount`), container `haiku-rag` healthy su http://127.0.0.1:8000/health.
 - [ ] Ingest di prova end-to-end (nel container).
 
 > ⚠️ **Lezione di rete:** connessione lenta/instabile. Pull Ollama + `uv add` in parallelo → `uv` fallisce per timeout (`transformers` wheel). Usare `UV_HTTP_TIMEOUT=600` e non scaricare modelli e pacchetti contemporaneamente.
@@ -130,7 +132,6 @@ Usare il **.md come sorgente di verità** per indicizzazione e reindex.
 LLM (select da `ollama list` + pull), temperature, max_tokens, thinking · Embedder (select + avviso reindex) · VLM + max_tokens + prompt descrizione (IT, "descrivi in modo preciso: testo visibile, dati di grafici/tabelle, relazioni") · chunk_size, chunker_type, tabelle markdown · OCR on/force, lingue · reranking on/off · profilo ingestion · stato Ollama (`/api/ps`, RAM).
 
 ## 8. Prossimi passi (in ordine)
-0. Chiudere i punti della sezione "Ripresa".
 1. Verificare pull completati (`~/Applications/Ollama.app/Contents/Resources/ollama list`) e `uv run haiku-rag doctor`.
 2. Test end-to-end da CLI: `uv run haiku-rag add-src <pdf>` + `uv run haiku-rag ask "..."`; misurare RAM (`/api/ps`) e tempi; verificare la qualità delle descrizioni VLM (prompt in `prompts.picture_description`) e la latenza del reranker.
 3. Verificare API Python di haiku.rag (client, multi-db, conversione a Markdown via Docling) — leggere il codice in `.venv/lib/python3.12/site-packages/haiku/rag/`.
