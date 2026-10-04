@@ -52,7 +52,7 @@ processing:
     picture_description:
       model:
         provider: ollama
-        name: qwen3-vl:8b
+        name: qwen3-vl:8b-instruct
         thinking: false
       timeout: 180
       max_tokens: 700                  # descrizioni precise (default upstream 200)

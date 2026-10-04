@@ -12,7 +12,7 @@ RAG completamente locale basato su [haiku.rag](https://github.com/ggozad/haiku.r
 │  Ollama (nativo, GPU Metal) :11434                                    │
 │   ├─ qwen3.6:35b-a3b      LLM per le risposte                         │
 │   ├─ qwen3-embedding:4b   embeddings (2560 dim, multilingue)          │
-│   └─ qwen3-vl:8b          descrizione immagini in ingestion           │
+│   └─ qwen3-vl:8b-instruct descrizione immagini in ingestion           │
 │            ▲                                                          │
 │            │ host.docker.internal                                     │
 │  ┌─────────┴──────── Colima (VM Docker) ───────────┐                  │
@@ -34,7 +34,7 @@ RAG completamente locale basato su [haiku.rag](https://github.com/ggozad/haiku.r
 |---|---|---|---|
 | LLM | `qwen3.6:35b-a3b` | ~22 GB | MoE: qualità alta e ~40 tok/s su M1 Max; il prompt processing veloce è decisivo nel RAG |
 | Embeddings | `qwen3-embedding:4b` | ~3 GB | Multilingue (IT/EN), 32K contesto, vicino al top MTEB |
-| Visione | `qwen3-vl:8b` | ~6 GB | Descrizioni precise delle immagini, caricato solo in ingestion |
+| Visione | `qwen3-vl:8b-instruct` | ~7 GB | Descrizioni precise delle immagini, caricato solo in ingestion |
 | Reranker | `BAAI/bge-reranker-v2-m3` | ~0,6 GB | Cross-encoder locale multilingue |
 
 L'analisi di fattibilità completa (alternative scartate, misure) è in [`HANDOFF.md`](HANDOFF.md#4-modelli-analisi-di-fattibilità).
@@ -55,10 +55,10 @@ OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_KEEP_ALIVE=10m ollama serve &
 
 ollama pull qwen3.6:35b-a3b
 ollama pull qwen3-embedding:4b
-ollama pull qwen3-vl:8b
+ollama pull qwen3-vl:8b-instruct
 
 # 2. Runtime container
-colima start --vm-type vz --mount-type virtiofs --cpu 4 --memory 8 \
+colima start --vm-type vz --mount-type virtiofs --cpu 4 --memory 6 \
   --mount ~/haiku-rag-data:w
 
 # 3. RAG

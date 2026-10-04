@@ -19,4 +19,4 @@ services:
       resources:
         limits:
           cpus: "${RAG_CPUS:-4}"
-          memory: ${RAG_MEMORY:-6g}
+          memory: ${RAG_MEMORY:-4500m}

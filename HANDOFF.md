@@ -60,7 +60,7 @@ In RAG il collo di bottiglia è il **prompt processing** (contesti 4–8k token)
 | **Embeddings** | `qwen3-embedding:4b` | ~3 GB | 2560 dim, 32K ctx, multilingue, MTEB ~67 |
 | Embeddings "eco" | `qwen3-embedding:0.6b` | <1 GB | Fallback leggero (MTEB ~60) |
 | Scartato | `qwen3-embedding:8b` | ~5–8 GB | Non convive con l'LLM |
-| **VLM** | `qwen3-vl:8b` | ~6 GB | Solo durante l'ingestion |
+| **VLM** | `qwen3-vl:8b-instruct` | ~7,4 GB | Solo durante l'ingestion. **Non** la variante thinking (vedi §5c) |
 | Reranker | `BAAI/bge-reranker-v2-m3` (cross-encoder) | ~0.6 GB | Opzionale, **da verificare** il supporto/nome chiave in haiku.rag |
 
 ## 5. Stato setup (fatto in questa sessione)
@@ -88,11 +88,28 @@ File: `Dockerfile`, `compose.yaml`, `docker/entrypoint.sh`, `docker/default.haik
 - OCR nel container: **Tesseract `ita`+`eng`** (ocrmac è solo macOS; resta per l'esecuzione nativa, dipendenza con marker `sys_platform == 'darwin'`).
 - `/data/config/haiku.rag.yaml` creato dall'entrypoint al primo avvio copiando `docker/default.haiku.rag.yaml`; poi è la pagina Admin a modificarlo. Modelli Docling/HF scaricati una volta in `/data/cache/huggingface`.
 - Ollama raggiunto a `http://host.docker.internal:11434` (`extra_hosts: host-gateway`). Con Colima funziona anche con Ollama in ascolto su 127.0.0.1 (**verificato**).
-- Limiti risorse da `.env`: `RAG_CPUS=4`, `RAG_MEMORY=6g`, `RAG_THREADS=2`; porta solo su `127.0.0.1:8000`.
-- Colima avviato con: `colima start --vm-type vz --vz-rosetta --mount-type virtiofs --cpu 4 --memory 8 --disk 60 --mount ~/haiku-rag-data:w --mount <progetto>`.
+- Limiti risorse da `.env`: `RAG_CPUS=4`, `RAG_MEMORY=4500m`, `RAG_THREADS=2`; porta solo su `127.0.0.1:8000`.
+- Colima avviato con: `colima start --vm-type vz --vz-rosetta --mount-type virtiofs --cpu 4 --memory 6 --disk 60 --mount ~/haiku-rag-data:w --mount <progetto>`.
 - Spostare su un'altra macchina: repo (o immagine `docker save`) + cartella dati + Ollama installato sull'host. Immagine buildata per arm64: su server x86 rifare `docker compose build` (o `buildx --platform linux/amd64`).
 - Ingestion nel container: Docling su CPU (niente MPS) → più lenta che nativa, ma i limiti del container la tengono sotto controllo.
 - App attuale: solo `GET /health` (`src/haiku_local_rag/main.py`) — config caricata + raggiungibilità Ollama.
+
+## 5c. Lezioni dal primo ingest di prova (2026-10-04)
+PDF di test: voce Wikipedia IT "Colosseo" (20 pagine, ~32 immagini) in `~/haiku-rag-data/test-docs/`.
+- **VLM con thinking = inutilizzabile in ingestion**: `qwen3-vl:8b` genera >1000 token di ragionamento per immagine
+  (`thinking: false` non arriva al modello via `/v1/chat/completions`), 25–110 s/immagine → timeout a 900 s.
+  → Usare **`qwen3-vl:8b-instruct`** (nessuna capability `thinking`): **~15 s/immagine, 42 tok/s gen, 249 tok/s prompt**.
+  → L'auto-configurazione deve preferire per il ruolo VLM i modelli senza capability `thinking`.
+- **Contesa GPU da parte di macOS**: `mediaanalysisd` (analisi libreria Foto, dopo aggiornamento OS) ha tenuto la GPU al 30–70%
+  per ore → tutti i modelli ~8–10× più lenti (VLM 3,9 tok/s, LLM 6,2 tok/s) pur con 42/42 layer su GPU.
+  Diagnosi senza sudo: `ioreg -r -d 1 -c IOAccelerator | grep "Device Utilization %"` con Ollama fermo.
+  → Auto-configurazione: misurare l'utilizzo GPU prima del benchmark e avvisare se > 15%.
+  → Coda ingestion: fase VLM rimandabile/ritentabile quando la GPU è occupata.
+- **Memoria**: VM Colima (vz) teneva ~8 GB wired + modelli → Mac in swap e "metal_partial_offload".
+  Ridotta a **6 GB** (`colima start --memory 6`), limite container **4,5 GB** (Docling picco osservato ~2 GB).
+  Budget GPU: 24,96 GiB (Metal) — LLM 20,4 GiB + embedder ~3 GiB ci stanno; LLM + VLM (7,4 GiB) **no** → mai insieme.
+- `conversion_timeout` portato a 1800 s (editabile da Admin).
+- Gli errori Tesseract "OSD failed … Too few characters" sono innocui (rilevamento orientamento su immagini senza testo).
 
 ## 6. Vincoli tecnici di haiku.rag (dalla doc)
 - Config: `haiku.rag.yaml` (cwd) o `HAIKU_RAG_CONFIG_PATH`. Corpus = `lancedb.databases.<nome>: <path>`.
