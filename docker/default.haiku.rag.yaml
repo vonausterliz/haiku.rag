@@ -21,10 +21,9 @@ qa:
     max_tokens: 1500
     thinking: false
 
-reranking:
-  model:
-    provider: cross-encoder            # locale, multilingue, ~600 MB
-    name: BAAI/bge-reranker-v2-m3      # provider verificato in haiku/rag/reranking
+# Reranker disattivato nel container: il cross-encoder gira su CPU (niente GPU in Docker su macOS)
+# e costa minuti per domanda. Attivabile da Admin (es. BAAI/bge-reranker-v2-m3) su host con GPU NVIDIA.
+reranking: {}
 
 processing:
   chunk_size: 384
@@ -63,8 +62,8 @@ lancedb:
 
 prompts:
   picture_description: >-
-    Describe this image precisely and exhaustively, in the same language as any text it contains
-    (Italian or English). State the image type (photo, chart, diagram, table, screenshot, scan, logo).
-    Transcribe ALL visible text verbatim. For charts and tables report axes, labels, units and every
-    readable value. For diagrams describe components and their relationships/flows. Mention notable
-    visual details relevant to understanding the document. Do not invent information that is not visible.
+    Descrivi questa immagine in italiano, in modo preciso ed esaustivo. Indica il tipo di immagine
+    (foto, grafico, diagramma, tabella, mappa, screenshot, scansione, logo). Trascrivi parola per parola
+    TUTTO il testo visibile, nella sua lingua originale. Per grafici e tabelle riporta assi, etichette,
+    unità di misura e tutti i valori leggibili. Per i diagrammi descrivi componenti, relazioni e flussi.
+    Non inventare nulla che non sia visibile.

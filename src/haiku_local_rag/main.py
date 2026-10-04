@@ -1,5 +1,6 @@
 """App FastAPI: pagina Chat (/), pagina Admin (/admin) e relative API."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -8,15 +9,22 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from haiku.rag.client import HaikuRAG
 from pydantic import BaseModel, ValidationError
 
-from haiku_local_rag import settings
+from haiku_local_rag import rag, settings
 from haiku_local_rag.ollama import OllamaClient
 
 HERE = Path(__file__).parent
 
-app = FastAPI(title="haiku-local-rag")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+    await rag.close()
+
+
+app = FastAPI(title="haiku-local-rag", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 
@@ -153,9 +161,8 @@ class AskRequest(BaseModel):
 async def ask(body: AskRequest) -> dict:
     if not body.question.strip():
         raise HTTPException(400, "Domanda vuota")
-    config = settings.load_config()
-    async with HaikuRAG(config=config, read_only=True) as rag:
-        answer, citations = await rag.ask(body.question, sources=body.corpora or None)
+    client = await rag.get_client()
+    answer, citations = await client.ask(body.question, sources=body.corpora or None)
     return {
         "answer": answer,
         "citations": [
